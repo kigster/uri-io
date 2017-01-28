@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/kigster/uri-io.svg?branch=master)](https://travis-ci.org/kigster/uri-io)
+
 # URI::IO
 
 This gem was born out of the need to be able to read data, and write data via a large number of ways. There are two parts to this: 
@@ -11,9 +13,11 @@ In addition, a popular `OpenURI` extension adds the `open` call to `http[s]`, `f
 
 However, what I wanted is a gem that not only understands much wider set of URIs than what `OpenURI` supports today, but can also read/write, as well as delete local or remote resources defined via URIs.
 
-### Why is this useful?
+## Why is this useful?
 
 This functionality could be so tremendously helpful because any ruby program that reads and writes data can suddenly replace File.read with, something completely generic:
+
+## What can it do?
 
 ##### Environment Variables
 
