@@ -1,4 +1,5 @@
 require 'uri/io/version'
+require 'uri/io/errors'
 
 module URI
   def self.register(klass, name = klass.name.gsub(/URI::/, ''))
@@ -16,38 +17,61 @@ end
 
 module URI
   module IO
-    class UnknownAction < StandardError;
-    end
-    class ParseError < StandardError;
+    # We constrain URI::IO to the same class-level operations of the top level ::IO
+    # namespace as convenience. Not all methods will be implemented for every scheme.
+    ALLOWED_IO_OPERATIONS = ::IO.methods - Object.methods + [ :delete ]
+
+    # Returns root folder for this gem's sources
+    def self.gem_root
+      File.expand_path('../', File.basename(__FILE__))
     end
 
+    # List of all registered handlers
     @handlers = {}
+
+    class Proxy
+      attr_accessor :uri, :handler
+
+      def initialize(uri)
+        self.uri = URI.parse(uri)
+        self.handler = URI::IO.handlers[self.uri.scheme]
+        raise HandlerNotFound, "Unable to handle scheme #{uri.scheme}, no registered handler found." unless self.handler
+      end
+
+      def method_missing(action, *args, **opts, &block)
+        super unless handler || !handler.respond_to?(action)
+        handler.send(action, *args, **opts, &block)
+      end
+    end
 
     class << self
       attr_accessor :handlers
 
+      # Register a new handler class
       def register_handler(klass, **opts, &block)
-        name = klass.name.gsub(/^URI::IO::(\w+)Handler$/, "\\1").downcase
+        name = handler_name_from_class(klass)
+        unknown_operations = (opts[:operations] || []) - ALLOWED_IO_OPERATIONS
+        raise URI::IO::UnsupportedOperation, "Operation(s) #{unknown_operations} are not supported, only #{ALLOWED_IO_OPERATIONS} are." unless unknown_operations.empty?
+
         handlers[name] ||= {
           class:      klass,
           operations: opts.delete(:operations),
           options:    opts
         }
+
         yield handlers[name] if block_given?
         handlers[name]
       end
 
-      def method_missing(action, uri, *args, **opts, &block)
-        scheme, = input.split('://')
-        super unless handlers[scheme]
-        action(name, *args, **opts, &block)
+      def [](uri)
+        URI::IO::Proxy.new(uri)
       end
 
-      def action(action, uri, data = nil, **opts, &block)
-        uri = URI.parse(uri)
-        handlers[uri.scheme]&.send(action, uri, data, **opts, &block)
-      end
+      private
 
+      def handler_name_from_class(klass)
+        klass.name.gsub(/^URI::IO::(\w+)Handler$/, "\\1").downcase
+      end
     end
   end
 end
