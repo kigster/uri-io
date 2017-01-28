@@ -1,4 +1,11 @@
+[![Downloads](http://ruby-gem-downloads-badge.herokuapp.com/uri-io?type=total)](https://rubygems.org/gems/uri-io)
+[![Gem Version](https://badge.fury.io/rb/uri-io.svg)](https://badge.fury.io/rb/uri-io)
+
 [![Build Status](https://travis-ci.org/kigster/uri-io.svg?branch=master)](https://travis-ci.org/kigster/uri-io)
+[![Code Climate](https://codeclimate.com/repos/588d08ab8dcb7c006a004c31/badges/fbe3044e50dfc06f7b93/gpa.svg)](https://codeclimate.com/repos/588d08ab8dcb7c006a004c31/feed)
+[![Test Coverage](https://codeclimate.com/repos/588d08ab8dcb7c006a004c31/badges/fbe3044e50dfc06f7b93/coverage.svg)](https://codeclimate.com/repos/588d08ab8dcb7c006a004c31/coverage)
+[![Issue Count](https://codeclimate.com/repos/588d08ab8dcb7c006a004c31/badges/fbe3044e50dfc06f7b93/issue_count.svg)](https://codeclimate.com/repos/588d08ab8dcb7c006a004c31/feed)
+
 
 # URI::IO
 
