@@ -6,69 +6,138 @@
 [![Test Coverage](https://codeclimate.com/repos/588d08ab8dcb7c006a004c31/badges/fbe3044e50dfc06f7b93/coverage.svg)](https://codeclimate.com/repos/588d08ab8dcb7c006a004c31/coverage)
 [![Issue Count](https://codeclimate.com/repos/588d08ab8dcb7c006a004c31/badges/fbe3044e50dfc06f7b93/issue_count.svg)](https://codeclimate.com/repos/588d08ab8dcb7c006a004c31/feed)
 
+> **WARNING**: This gem is currently under active development, and is not yet stable. Use at your own risk.
 
 # URI::IO
 
-This gem was born out of the need to be able to read data, and write data via a large number of ways. There are two parts to this: 
+## Summary
 
- 1. Defining the syntax for describing where to read it from
- 2. Implementing actual read/write code for each type.
+This gem aims to combine the extensibility of the `URI` class — its design supports adding new and custom URI __schemes__, with the idea of a consistent interface to read/write resources offered by the `OpenURI` standard ruby module, and aims to greatly expand the list of URIs that can be used to *read*, *write*, (maybe also *append*) and *delete* resources. 
 
-The most natural fit for #1 is using the `URI` ruby module. It can already be extended, and supports many schemes out the box.
+## Usage
 
-In addition, a popular `OpenURI` extension adds the `open` call to `http[s]`, `ftp`, and `ssh` protocols.
+The overall interface very simple, but powerful:
 
-However, what I wanted is a gem that not only understands much wider set of URIs than what `OpenURI` supports today, but can also read/write, as well as delete local or remote resources defined via URIs.
+```ruby
+require 'uri-io'
+URI::IO.from([URI]).operation
+URI::IO[[URI]].operation
+```
 
-## Why is this useful?
+Let's take a look at a few examples:
 
-This functionality could be so tremendously helpful because any ruby program that reads and writes data can suddenly replace File.read with, something completely generic:
+```ruby
+require 'uri-io'
 
-## What can it do?
+URI::IO['env://HOME'].read
+# => "/Users/"
+
+URI::IO['file:///usr/local/etc/hosts'].read
+# => "127.0.0.1    localhost\n...."
+URI::IO['file:///usr/local/etc/hosts'].write(data)
+# => 23425
+URI::IO['file:///usr/local/etc/hosts'].delete
+# => true
+
+URI::IO['redis:///1/mykey'].write('keyvalue')
+# => 8
+URI::IO['redis:///1/mykey'].read
+# => "keyvalue"
+URI::IO['redis:///1/mykey'].delete
+# => true
+```
+
+
+### Using DSL 
+
+_[ Not yet implemented ]_
+
+This module decorates string with the `#io` method, which attempts to parse the string into the URI first, and then find an appropriate handler supporting IO operations for this resource.
+
+```ruby
+File.exist?('/home/kig/.bashrc')
+# => true
+
+require 'uri/io/string'
+uri = 'file:///home/kig/.bashrc'
+uri.io.read
+# => "#!/usr/bin/env bash\n...... "
+uri.io.write('echo "Your bashrc has been wiped"')
+# => 45
+uri.io.append('echo "Maybe not completely"')
+# => 334
+uri.io.delete
+# => true
+File.exist?('/home/kig/.bashrc')
+# => false
+```
+
+### Motivation
+
+This gem was born out of the desire to easily read and write data via a large number of ways during development of another gem — [sym](https://github.com/kigster/sym) — which performs symmetric encryption, and needs to read the private key and the data, and write the result (and sometimes the private key). After running out of flags to pass indiciating how exactly the private key is supplied, I had an epiphany — what if I can just use one flag with the data source URI? 
+
+### Approach
+
+There are two high-level steps required to create a unified way of reading/writing various resources:
+
+ 1. One must define the syntax for describing how to access it
+ 2. One must implement the actual read/write code for each supported syntax.
+
+The most natural fit for 1 seems to be the `URI` module. It can be easily extended by design, and already supports many schemes out the box. In addition, a popular `OpenURI` extension adds the `open` call to `http[s]`, `ftp`, and `ssh` protocols, partially providing #2 for these schemes.
+
+However, `OpenURI` only supports a few protocols, and does not currently support *delete* operation. 
+
+The approach we take is to extend `URI` with the schemes with support, and fulfill them using `Handlers` that can be easily added.
+
+## Supported URIs
+
+The following types are planned to be supported:
 
 ##### Environment Variables
 
 ```ruby
-URI::IO('env://HOME').read
+URI::IO['env://HOME').read
 # => /Users/kig
 ```
+##### Redis
 
-##### Arbitrary Redis Operation
+###### Read/Write Hash Value by Key
 
 ```ruby
-URI::IO('redis://localhost:6379/1/set,firstname,konstantin').write
+URI::IO['redis://localhost:6379/1/firstname').write('konstantin')
 # => 'OK'
+URI::IO['redis://localhost:6379/1/firstname').read
+# => 'konstantin'
 ```
+
+###### Any Operation?
+
+```ruby
+URI::IO['redis://localhost:6379/1/operation').run(*args)
+```
+
 ##### File Operation
 
 ```ruby
-URI::IO('scp://user@host/path/file').delete
+URI::IO['scp://user@host/path/file').delete
 ```
 
-As I continued on this path, I've thought of the following candidate URIs. Not all of them can support writing or deleting the resource, but all of them can read the data:
-
-Existing URIs supported by OpenURI:
-
-    http[s]://user@host/path/file    
-    file://filename                  
-    ftp[s]://user@host/path/file
-    
 Suggested possible ways of accessing local and remote data:
 
 ```ruby
-URI::IO('string://value').read
+URI::IO['string://value'].read
 # => "value"
 
-URI::IO('env://PATH').read
+URI::IO['env://PATH').read
 # => "/bin:/usr/bin:/usr/local/bin"
 
-URI::IO('stdin:/').read
+URI::IO['stdin:/'].read
 # => data from STDIN until EOF
 
-URI::IO('shell://echo%20hello').read
+URI::IO['shell://echo%20hello'].read
 # => "hello"
 
-URI::IO('redis://127.0.0.1:6397/1/get,firstname').read
+URI::IO['redis://127.0.0.1:6397/1/get,firstname'].read
 # => 'konstantin'
 ```
 
@@ -77,12 +146,6 @@ Similarly, we could read data from:
     memcached://127.0.0.1:11211/operation,arg1,arg2,...
     scp://user@host/path/file        
     postgresql://user@host/db/?sql=<sql-query>
-
-And so on.
-
-### Command Line Tools
-
-If you are building a command line tool, you can ask for input in the for of `uri-io` supported URI, and then read/write to it, as well as delete it.
 
 ## Installation
 
@@ -100,9 +163,6 @@ Or install it yourself as:
 
     $ gem install uri-io
 
-## Usage
-
-TODO: Write usage instructions here
 
 ## Development
 
